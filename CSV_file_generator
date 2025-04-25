@@ -1,0 +1,40 @@
+#csv file generator upload you aligned file (DNA sequence file)
+from Bio import AlignIO
+import pandas as pd
+from collections import Counter
+
+# Load your aligned FASTA file
+alignment = AlignIO.read("your_alignment.fasta", "fasta")  # Replace with your file
+
+# Extract sequence data
+seqs = [str(record.seq).lower() for record in alignment]
+ids = [record.id for record in alignment]
+
+# Find variable (SNP/indel) positions
+variable_positions = []
+for i in range(len(seqs[0])):
+    column = [seq[i] for seq in seqs]
+    if len(set(column)) > 1:  # At least two different bases
+        variable_positions.append(i)
+
+# Build haplotype table
+haplotypes = []
+for seq in seqs:
+    hap = [seq[i] for i in variable_positions]
+    haplotypes.append(tuple(hap))
+
+# Count haplotype frequencies
+hap_counter = Counter(haplotypes)
+
+# Prepare DataFrame
+hap_df = pd.DataFrame(list(hap_counter.items()), columns=["Haplotype", "freq"])
+hap_df[["pos_" + str(p+1) for p in variable_positions]] = pd.DataFrame(hap_df["Haplotype"].tolist(), index=hap_df.index)
+hap_df = hap_df.drop(columns=["Haplotype"])
+
+# Add H001, H002... IDs
+hap_df.insert(0, "ALLELE", ["H{:03d}".format(i+1) for i in range(len(hap_df))])
+
+# Save CSV
+hap_df.to_csv("haplotype_table.csv", index=False)
+
+print("✅ Haplotype table saved as 'haplotype_table.csv'.")
